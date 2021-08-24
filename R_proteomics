@@ -1,0 +1,89 @@
+data_exp<- read_excel("Desktop/LABY/Projects_2021/magisterka/proteomika/proteomika_scatter.xlsx")
+View(data_exp)
+
+c<- ggplot(data_exp, aes(x=upregulated_in, y=AV_3, color=upregulated_in, alpha = Identification), height = 5)
+c<- c+ geom_jitter() + scale_color_manual(values=c(col_R_E, col_S_C)) 
+c<- c + scale_alpha_manual(values = c(1, 0.5)) + theme_bw() 
+c + labs(y="AV [fold change]", x="Fraction", subtitle = "upregulated proteins in the given fractions") + ggtitle("AphR and AphS - proteomic differences")
+
+
+
+d<- ggplot(data_exp, aes(x="AphR fraction", y=AV, color=comp_to_S, shape = Identification), height = 5)
+d<- d+ geom_jitter(size=1.5) + scale_color_manual(values=c("magenta3", "green4"), breaks = c("upregulated", "downregulated")) 
+d<- d + scale_shape_manual(values = c(19, 17)) + theme_bw() 
+d<- d + labs(y="AV [fold change]", x="Fraction", subtitle = "Up- and down regulated proteins in AphR compared to AphS") + ggtitle("AphR - differentiated protein expression")
+d + theme(legend.title = element_blank()) + geom_hline(yintercept=0, alpha = 0.25)
+
+
+d<- ggplot(data_exp, aes(x=Identification, y=AV, color=AV), height = 5)
+d<- d+ geom_jitter() + scale_fill_gradient2()
+
+
+
+slices <- c(8,
+            8,
+            2,
+            1,
+            1,
+            4,
+            2,
+            4,
+            1,
+            1,
+            1,
+            14,
+            1)
+length(slices)
+lbls <- c("Protein biosynthesis",
+          "Calvin cycle",
+          "PPP",
+          "Krebs cycle",
+          "ATP production",
+          "Glycolysis",
+          "Glycogen",
+          "Cobalamin, Steroid and Porphyrin biosynthesis",
+          "DNA replication",
+          "Sugar transport",
+          "Cell-wall synthesis",
+          "Iron uptake",
+          "unknown" )
+
+lbls <- factor(lbls, levels = lbls)
+
+
+cols_<-c(brewer.pal(n = 12, name = "Paired")[12],
+         brewer.pal(n = 12, name = "Paired")[8],
+         brewer.pal(n = 12, name = "Paired")[7],
+         brewer.pal(n = 12, name = "Paired")[5],
+         brewer.pal(n = 12, name = "Paired")[6],
+         brewer.pal(n = 12, name = "Paired")[9],
+         brewer.pal(n = 12, name = "Paired")[3],
+         brewer.pal(n = 12, name = "Paired")[4],
+         brewer.pal(n = 12, name = "Paired")[11],
+         brewer.pal(n = 12, name = "Paired")[1],
+         brewer.pal(n = 12, name = "Paired")[2],
+         brewer.pal(n = 12, name = "Paired")[10],
+         "white"
+         )
+
+bf<-data_frame(slices,lbls, cols_)
+          
+bp<- ggplot(bf, aes(x="", y=slices, fill=lbls))+
+  geom_bar(width = 3, stat = "identity", color="grey90")
+bp +scale_y_discrete(limits=lbls)
+
+pie <- bp + coord_polar("y")
+pie<- pie + scale_fill_manual(values=cols_)
+pie<- pie + theme_void() + theme(axis.title.x = element_blank(),
+            axis.title.y = element_blank(),
+            panel.border = element_blank(),
+            panel.grid=element_blank(),
+            axis.ticks = element_blank(), 
+            plot.title=element_text(size=14, face="bold"), 
+            axis.text.x=element_blank())
+
+pie<- pie + geom_text(aes(label = slices), size = 2.5, position = position_stack(vjust = 0.5)) + ggtitle("Number of spots assigned to a biological process")
+pie + guides(fill = guide_legend(title = "")) + theme(
+  plot.title=element_text( hjust=-0.1, vjust=7, face='bold')
+) 
+

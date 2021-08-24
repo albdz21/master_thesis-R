@@ -1,0 +1,436 @@
+#first, load the needed packages!
+#install.packages("matrixStats")
+library(readxl)
+library(writexl)
+library(openxlsx)
+library(xlsx)
+library(tidyr)
+library(dplyr)
+library(matrixStats)
+library(ggplot2)
+library(RColorBrewer)
+library(ggpubr)
+library("stringr")
+library(gridExtra)
+#install.packages("ggpubr")
+#display.brewer.all()
+
+display.brewer.pal(n=12,name = 'Paired')
+brewer.pal(n = 4, name = "Dark2")
+
+col_S_C<-brewer.pal(n = 4, name = "Dark2")[1]
+col_S_E<-brewer.pal(n = 4, name = "Dark2")[2]
+col_R_C<-brewer.pal(n = 4, name = "Dark2")[3]
+col_R_E<-brewer.pal(n = 4, name = "Dark2")[4]
+
+
+get_legend<-function(myggplot){
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)}
+legend<- get_legend(p)
+
+#Choose which experiment you want to plot
+data_exp<- read_excel("Desktop/LABY/Projects_2021/magisterka/experiments/Aph_RS_all_data.xlsx", 
+                      sheet = "Exp_2")
+data_exp<- read_excel("Desktop/LABY/Projects_2021/magisterka/experiments/Aph_RS_all_data.xlsx", 
+                      sheet = "Exp_3")
+data_exp<- read_excel("Desktop/LABY/Projects_2021/magisterka/experiments/Aph_RS_all_data.xlsx", 
+                      sheet = "Exp_1")
+#data_exp<-data_exp[1:11]
+
+View(data_exp)
+colnames(data_exp)
+
+data_exp$Name_short <- paste("exp", data_exp$Experiment, "_", data_exp$Fraction, "_", data_exp$Group, "_", data_exp$Timepoint)
+data_exp$Label<-paste("Aph", data_exp$Fraction, ": ", data_exp$Group)
+
+data_exp$Sample<-as.numeric(data_exp$Sample)
+data_exp$hpi<-as.numeric(data_exp$hpi)
+#data_exp$OD<-data_exp$OD / 1000
+#write_xlsx(data_exp,"Desktop/results.xlsx")
+
+
+
+
+
+#OD
+colnames(data_exp)
+len<-length(colnames(data_exp))
+len_<-len-1
+tidy_data <-data_exp[,c(1:7, 8, len_, len)]
+View(tidy_data)
+
+
+avg<- group_by(tidy_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(OD, na.rm = TRUE),
+    sd = sd(OD, na.rm = TRUE)
+  )
+avg
+
+hpi_<-unique(tidy_data$hpi)
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=10))
+fraction_<-sort(fraction_)
+group_<-c(rep("C", times=5), rep("E", times=5), rep("C", times=5), rep("E", times=5))
+group_
+
+avg<-bind_cols(avg, hpi_, fraction_, group_)
+colnames(avg)<-c(colnames(avg)[1:4],"hpi", "Fraction", "Group")
+avg$Label<-paste("Aph", avg$Fraction, ": ", avg$Group)
+colnames(avg)
+avg
+
+
+odch_minus<-avg$mean - avg$sd
+odch_plus<-avg$mean + avg$sd
+p<-ggplot(data = avg, aes(x=hpi, y=mean, group=Label, colour=Label,fill=Label)) 
+p<- p + geom_ribbon(aes(ymin=odch_minus, ymax=odch_plus), alpha=.2, color=NA) + geom_point(size = 1.5, alpha = 1.5) 
+p<-p + geom_line(linetype="dotted") + facet_grid(.~Fraction)
+p<- p + theme_bw() + labs(y="OD730", subtitle="AphR and AphS vs CL131 - Experiment 3") + ggtitle("Optical Density")
+p<- p + scale_x_continuous(breaks = as.numeric(names(table(tidy_data$hpi)))) 
+p <- p+  scale_fill_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+p <- p + scale_color_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+p 
+
+#FVM
+colnames(data_exp)
+len<-length(colnames(data_exp))
+len_<-len-1
+tidy_data <-data_exp[,c(1:7, 26, len_, len)]
+View(tidy_data)
+tidy_data$Fvm<-as.numeric(tidy_data$Fvm)
+
+avg<- group_by(tidy_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(Fvm, na.rm = TRUE),
+    sd = sd(Fvm, na.rm = TRUE)
+  )
+avg
+
+hpi_<-unique(tidy_data$hpi)
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=10))
+fraction_<-sort(fraction_)
+group_<-c(rep("control", times=5), rep("infected", times=5), rep("control", times=5), rep("infected", times=5))
+group_
+
+avg<-bind_cols(avg, hpi_, fraction_, group_)
+colnames(avg)<-c(colnames(avg)[1:4],"hpi", "Fraction", "Group")
+avg$Label<-paste(avg$Fraction, "- ", avg$Group)
+colnames(avg)
+avg
+
+
+odch_minus<-avg$mean- avg$sd
+odch_plus<-avg$mean + avg$sd
+q<-ggplot(data = avg, aes(x=hpi, y=mean, group=Label, colour=Label,fill=Label)) 
+q<- q + geom_point(size = 1.5, alpha = 1.5)  + geom_errorbar(aes(ymin=odch_minus, ymax=odch_plus), alpha=0.2, color="black") 
+q<-q + geom_line(linetype="dotted") + facet_grid(.~Fraction)
+q<- q + theme_bw() + labs(y="FV/FM [a.u.]", x = "Time [hours post inoculation]", subtitle="Experiment 2 - April/May") + ggtitle("PS II performance: Fv/FM")
+q<- q + scale_x_continuous(breaks = as.numeric(names(table(tidy_data$hpi)))) 
+q <- q+  scale_fill_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+q <- q + scale_color_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+q + theme(legend.title = element_blank())
+
+
+#Titre
+colnames(data_exp)
+len<-length(colnames(data_exp))
+len_<-len-1
+tidy_data <-data_exp[,c(1:7, 9, len_, len)]
+#tidy_data <-data_exp[,c(1:7, 8, len)]
+View(tidy_data)
+
+
+avg<- group_by(tidy_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(Titre, na.rm = TRUE),
+    sd = sd(Titre, na.rm = TRUE)
+  )
+avg
+
+#dla exp1
+hpi_<-sort(unique(tidy_data$hpi))
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=12))
+fraction_<-sort(fraction_)
+group_<-c(rep("C", times=6), rep("E", times=6), rep("C", times=6), rep("E", times=6))
+group_
+
+#dla reszty
+hpi_<-unique(tidy_data$hpi)
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=10))
+fraction_<-sort(fraction_)
+group_<-c(rep("control", times=5), rep("infected", times=5), rep("control", times=5), rep("infected", times=5))
+group_
+
+avg<-bind_cols(avg, hpi_, fraction_, group_)
+colnames(avg)<-c(colnames(avg)[1:4],"hpi", "Fraction", "Group")
+avg$Label<-paste(avg$Fraction, " - ", avg$Group)
+colnames(avg)
+avg
+
+
+#dla E 
+data_qPCR<-data_exp
+a<-which(data_qPCR$Group == "infected")
+data_qPCR<-data_qPCR[a,]
+#a<-which(data_qPCR$Fraction == "S")
+#data_qPCR<-data_qPCR[a,]
+View(data_qPCR)
+
+
+data_stats<-avg
+a<-which(data_stats$Group == "infected")
+data_stats<-data_stats[a,]
+#a<-which(data_stats$Fraction == "S")
+#data_stats<-data_stats[a,]
+View(data_stats)
+srednia <- data_stats$mean
+odch_std<-data_stats$sd
+#tutaj trzeba srednia skopiowac: wpierw posortuj dane alfabetycznie wg Name_short, potem skopiuj do notatnika, potem tutaj
+
+length(srednia)
+unique(data_qPCR$hpi)
+data_qPCR$hpi<-as.character(data_qPCR$hpi)
+
+#check this! and the fill=Fractionl
+corr_order<-c(0,24,52,72,96,120,144,168)
+corr_order<-c(0,24,48,72, 96,120)
+corr_order<-c(0,18,24,48,72, 96,120)
+
+corr_order <- factor(corr_order, levels = corr_order)
+
+l<-ggplot(data_qPCR, aes(x=hpi, y=Titre, fill=Label)) +  facet_grid(.~Fraction)
+l<- l +  geom_boxplot( middle=srednia, ymax=NA , ymin = NA) +stat_boxplot(ymax=srednia +odch_std, ymin = srednia - odch_std, geom='errorbar', width=0.5, alpha=0.8)
+l<- l + scale_x_discrete(limits=as.character(corr_order))
+l<- l+ geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5) 
+l<- l + scale_fill_manual(values=c(col_R_E, col_S_E)) + scale_y_continuous(limits=c(0, 2.5e+10))
+l<- l + theme_bw() + labs(y="phage titre [gp091 per mL]", x = "hpi", subtitle="A: Experiment 2 - April/March") + ggtitle("Phage production")
+l<- l + theme(legend.position = "top") + theme(legend.title = element_blank())
+legend<-get_legend(l)
+
+
+m<-ggplot(data_qPCR, aes(x=hpi, y=Titre, fill=Label)) +  facet_grid(.~Fraction)
+m<- m +  geom_boxplot( middle=srednia, ymax=NA , ymin = NA) +stat_boxplot(ymax=srednia +odch_std, ymin = srednia - odch_std, geom='errorbar', width=0.5, alpha=0.8)
+m<- m + scale_x_discrete(limits=as.character(corr_order)) + scale_y_continuous(limits=c(0, 2.5e+10))
+m<- m+ geom_dotplot(binaxis='y', stackdir='center', dotsize=0.5) 
+m<- m + scale_fill_manual(values=c(col_R_E, col_S_E)) 
+m<- m + theme_bw() + labs(y="phage titre [CL131 per mL]", x = "[hours post inoculation]", subtitle="B: Experiment 3 - June/July") + ggtitle("Phage production")
+m<- m + theme(legend.position = "none", axis.title.y = element_blank()) 
+m
+l
+
+l<-l + theme(legend.position = "none")
+grid.arrange(l, m, legend, ncol=2, nrow = 2, widths = c(2.7, 2.7), heights = c(2.5, 0.15), layout_matrix = rbind(c(1,2), c(3,3)))
+a + theme(legend.title = element_blank())
+
+
+#CELLS
+colnames(data_exp)
+len<-length(colnames(data_exp))
+len_<-len-1
+tidy_data <-data_exp[,c(1:7, 10, len_, len)]
+#View(tidy_data)
+
+
+avg<- group_by(tidy_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(Cell_length, na.rm = TRUE),
+    sd = sd(Cell_length, na.rm = TRUE)
+  )
+avg
+
+hpi_<-unique(tidy_data$hpi)
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=10))
+fraction_<-sort(fraction_)
+group_<-c(rep("control", times=5), rep("infected", times=5), rep("control", times=5), rep("infected", times=5))
+group_
+
+
+#to dla exp1
+hpi_<-sort(unique(tidy_data$hpi))
+hpi_<-c(rep(hpi_, times=4))
+fraction_<-unique(tidy_data$Fraction)
+fraction_<-c(rep(fraction_, times=12))
+fraction_<-sort(fraction_)
+group_<-c(rep("control", times=6), rep("infected", times=6), rep("control", times=6), rep("infected", times=6))
+group_
+
+avg<-bind_cols(avg, hpi_, fraction_, group_)
+colnames(avg)<-c(colnames(avg)[1:4],"hpi", "Fraction", "Group")
+avg$Label<-paste(avg$Fraction, "- ", avg$Group)
+colnames(avg)
+avg
+
+
+odch_minus<-avg$mean - avg$sd
+odch_plus<-avg$mean + avg$sd
+p<-ggplot(data = avg, aes(x=hpi, y=mean, group=Label, colour=Label,fill=Label)) 
+p<- p + geom_ribbon(aes(ymin=odch_minus, ymax=odch_plus), alpha=.2, color=NA) + geom_point(size = 1.5, alpha = 1.5) 
+p<-p + geom_line(linetype="dotted") + facet_grid(.~Fraction)
+p<- p + theme_bw() + labs(y="Cell number per mL",x="hpi", subtitle="A: Experiment 1 - Febr/March") + ggtitle("Cell count")
+p<- p + scale_x_continuous(breaks = c(0,24,48,120)) + scale_y_continuous(limits=c(0, 5e+06))
+p <- p+  scale_fill_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+p <- p + scale_color_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+p<- p + theme(legend.position = "top") + theme(legend.title = element_blank())
+p
+
+legend<- get_legend(p)
+
+
+#dla exp2
+a<-which(avg$hpi!=18)
+avg<-avg[a,]
+
+odch_minus_q<-avg$mean - avg$sd
+odch_plus_q<-avg$mean + avg$sd
+q<-ggplot(data = avg, aes(x=hpi, y=mean, group=Label, colour=Label,fill=Label)) 
+q<- q + geom_ribbon(aes(ymin=odch_minus_q, ymax=odch_plus_q), alpha=.2, color=NA) + geom_point(size = 1.5, alpha = 1.5) 
+q<-q + geom_line(linetype="dotted") + facet_grid(.~Fraction)
+q<- q + theme_bw() + labs(y="Cell number per mL", x="[hours post inoculation]",subtitle="B: Experiment 2 - April/March") + ggtitle("Cell count")
+q<- q + scale_x_continuous(breaks = c(0,24,48,120)) + scale_y_continuous(limits=c(0, 5e+06))
+q <- q+  scale_fill_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+q <- q + scale_color_manual(values=c(col_R_C, col_R_E, col_S_C, col_S_E)) 
+q<- q + theme(legend.position = "top", axis.title.y = element_blank(), legend.title = element_blank())
+
+legend<-get_legend(q)
+q<-q + theme(legend.position = "none")
+p<- p + theme(legend.position = "none")
+
+
+q
+
+grid.arrange(p, q, legend, ncol=2, nrow = 2, widths = c(2.7, 2.7), heights = c(2.5, 0.15), layout_matrix = rbind(c(1,2), c(3,3)))
+
+#SUMMARY
+#PODSUMOWANIE 
+
+#podsum_data<-data_frame()
+a<-which(data_exp$hpi==max(data_exp$hpi),)
+podsum_data<-rbind(podsum_data, data_exp[a,])
+b<-which(data_exp$hpi==min(data_exp$hpi),)
+podsum_data<-rbind(podsum_data, data_exp[b,])
+View(podsum_data)
+
+avg_cells<- group_by(podsum_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(Cell_length, na.rm = TRUE),
+    sd = sd(Cell_length, na.rm = TRUE)
+  )
+avg_cells
+nrow(avg_cells)
+
+even<-seq(0, nrow(avg_cells),2)
+odd<-seq(1, by=2, nrow(avg_cells))
+wzrosty <- data.frame(matrix(ncol = (12+4+4), nrow = nrow(avg_cells)/2))
+colnames(wzrosty)<-c("Exp", "Fraction", "t_0", "t_last", "Name_short_t0", "count", "Cell_t0_mean", "Cell_t0_sd", "Name_short2", "count2", "Titre_t0_mean", "Titre_t0_sd", "Name_shor_t_last", "count3", "Cell_tlast_mean", "Cell_tlast_sd","Name_short4", "count4", "Titre_tlast_mean", "Titre_tlast_sd")
+colnames(wzrosty)
+wzrosty[,5:8]<-avg_cells[odd,]
+wzrosty[,13:16]<-avg_cells[even,]
+
+wzrosty[1:4,1]<-1
+wzrosty[5:8,1]<-2
+wzrosty[9:12,1]<-3
+
+fraction_<-c(rep("R", times=2), rep("S", times=2), rep("R", times=2), rep("S", times=2), rep("R", times=2), rep("S", times=2))
+wzrosty[,2]<-fraction_
+t_start<-c(rep(0, times=12))
+wzrosty[,3]<-t_start
+t_end<-c(rep(168, times=4), rep(120, times=8))
+wzrosty[,4]<-t_end
+
+
+avg_titre<- group_by(podsum_data, Name_short) %>%
+  summarise(
+    count = n(),
+    mean = mean(Titre, na.rm = TRUE),
+    sd = sd(Titre, na.rm = TRUE)
+  )
+avg_titre
+nrow(avg_titre)
+
+colnames(wzrosty)
+
+wzrosty[,9:12]<-avg_titre[odd,]
+wzrosty[,17:20]<-avg_titre[even,]
+
+View(wzrosty)
+colnames(wzrosty)
+wzrosty<-wzrosty[,c(1:8,11:12,13, 15:16,19:20)]
+
+wzrosty<-add_tally(wzrosty, name="phage_host_ratio_t0")
+
+wzrosty$phage_host_ratio_t0<-wzrosty["Titre_t0_mean"]/wzrosty["Cell_t0_mean"]
+wzrosty$phage_host_ratio_tlast<-wzrosty["Titre_tlast_mean"]/wzrosty["Cell_tlast_mean"]
+l<-(100/(wzrosty[7]/wzrosty["Cell_tlast_mean"]))-100
+wzrosty$perc_growth_cells<-l
+wzrosty<-add_tally(wzrosty,name="%growth_titre")
+l<-(100/(wzrosty["Titre_t0_mean"]/wzrosty["Titre_tlast_mean"]))-100
+wzrosty$perc_growth_titre<-l
+
+
+write_xlsx(wzrosty,"Desktop/results.xlsx")
+wzrosty
+
+
+#PLOT
+data_exp<- read_excel("Desktop/LABY/Projects_2021/magisterka/experiments/Aph_RS_all_data.xlsx", 
+                      sheet = "summary")
+
+a<-which(data_exp$Group == "infected",)
+tidy_data<-data_exp[a,]
+View(tidy_data)
+
+p<- ggplot() + geom_col(data = tidy_data, aes(x=Experiment, y=phage_host_ratio_t5_t0, group=Name_short_legend, fill=Name_short_legend), position="dodge2", width=0.5, alpha=0.5)
+p<- p + theme_bw() + labs(y="phage:host ratio end : beginning", subtitle="last timepoint : first timepoint") + ggtitle("Change of phage:host ratio during the experiment")
+
+
+odch_minus<-tidy_data$host_phage_tlast - tidy_data$host_phage_tlast_error
+odch_plus<-tidy_data$host_phage_tlast + tidy_data$host_phage_tlast_error
+q<- ggplot() + geom_col(data = tidy_data, aes(x=Months, y=host_phage_tlast, group=Name_short_legend, fill=Name_short_legend), position="dodge2", width=0.5, alpha=0.5)
+q<- q + theme_bw() + labs(y="host:phage ratio at the last timepoint", x="Experiments in the given months") + ggtitle("Host:phage ratio at the end of the experiments")
+q<- q + scale_fill_manual(values=c(col_R_E, col_S_E)) + scale_x_discrete(limits=c("Febr/March", "April/May", "June/July"))
+q<- q + geom_errorbar(data = tidy_data, aes(x=Months, y=host_phage_tlast,ymin=odch_minus, ymax=odch_plus),  position=position_dodge2(width=0.5,padding = 0.5),width=0.5,alpha=.5, size =0.5,color="black")
+q + theme(legend.title = element_blank())
+
+
+odch_minus<-tidy_data$host_phage_t5_t0_change - tidy_data$host_phage_t5_t0_error
+odch_plus<-tidy_data$host_phage_t5_t0_change + tidy_data$host_phage_t5_t0_error
+q<- ggplot() + geom_col(data = tidy_data, aes(x=Months, y=host_phage_t5_t0_change, group=Name_short_legend, fill=Name_short_legend), position="dodge2", width=0.5, alpha=0.5)
+q<- q + theme_bw() + labs(y="change of host:phage ratio", x="Experiments in the given months") + ggtitle("Change of host:phage ratio throughout the experiments")
+q<- q + scale_fill_manual(values=c(col_R_E, col_S_E)) + scale_x_discrete(limits=c("Febr/March", "April/May", "June/July"))
+q<- q + geom_errorbar(data = tidy_data, aes(x=Months, y=host_phage_t5_t0_change,ymin=odch_minus, ymax=odch_plus),  position=position_dodge2(width=0.5,padding = 0.5),width=0.5,alpha=.5, size =0.5,color="black")
+q + theme(legend.title = element_blank())
+
+
+
+
+a<-which(data_exp$Name_short_legend != "AphS - infected",)
+tidy_data<-data_exp[a,]
+View(tidy_data)
+odch_minus<-tidy_data$change_cells - tidy_data$growth_cells_error
+odch_plus<-tidy_data$change_cells + tidy_data$growth_cells_error
+r<- ggplot() + geom_col(data = tidy_data, aes(x=Months, y=change_cells, group=Name_short_legend, fill=Name_short_legend), position="dodge2", width=0.5, alpha=0.5)
+r<- r + theme_bw() + labs(y="Change in growth", x="Experiments in the given months") + ggtitle("Change in growth") + scale_fill_manual(values=c(col_R_C, col_R_E, col_S_C)) 
+r<- r + geom_errorbar(data = tidy_data, aes(x=Months, y=change_cells,ymin=odch_minus, ymax=odch_plus),  position=position_dodge2(width=0.5,padding = 0.5),width=0.5,alpha=.5, size =0.5,color="black")
+r + theme(legend.title = element_blank())
+
+
+
+
